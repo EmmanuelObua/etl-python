@@ -1,81 +1,66 @@
 import time
 import pyodbc
+import schedule
 import warnings
 import pandas as pd
-from tqdm import tqdm
 from dotenv import dotenv_values
-from mysql_loader import load_csv_to_mysql
+from datetime import datetime, timedelta
+from etl_pipeline import load_csv_to_mysql, extract, transform, remove_file, file_path
 
-with warnings.catch_warnings():
-	warnings.simplefilter("ignore")
+def run_etl():
 
-	config = dotenv_values(".env")
+	with warnings.catch_warnings():
+		warnings.simplefilter("ignore")
 
-	# Oracle Variables
+		env = dotenv_values(".env")
 
-	username = config['USER_NAME']
-	password = config['PASSWORD']
-	host = config['HOST']
-	port = config['PORT']
-	service_name = config['SERVICE_NAME']
+		# Oracle Variables
 
-	# Mysql Variables
+		username = env['USER_NAME']
+		password = env['PASSWORD']
+		host = env['HOST']
+		port = env['PORT']
+		service_name = env['SERVICE_NAME']
 
-	mysql_username = config['MYSQL_USER_NAME']
-	mysql_password = config['MYSQL_PASSWORD']
-	mysql_host = config['MYSQL_HOST']
-	mysql_port = config['MYSQL_PORT']
-	mysql_database = config['MYSQL_DATABASE']
-	mysql_table = config['MYSQL_TABLE']
+		connection_string = f"DRIVER={{Oracle in OraClient11g_home1}};DBQ={host}:{port}/{service_name};UID={username};PWD={password}"
 
-	connection_string = f"DRIVER={{Oracle in OraClient11g_home1}};DBQ={host}:{port}/{service_name};UID={username};PWD={password}"
+		try:
 
-	try:
+			odbc_conn = pyodbc.connect(connection_string)
 
-		connection = pyodbc.connect(connection_string)
+			odbc_conn.setdecoding(pyodbc.SQL_CHAR, encoding='utf-8')
+			odbc_conn.setdecoding(pyodbc.SQL_WCHAR, encoding='utf-8')
+			odbc_conn.setencoding(encoding='utf-8')
 
-		connection.setdecoding(pyodbc.SQL_CHAR, encoding='utf-8')
-		connection.setdecoding(pyodbc.SQL_WCHAR, encoding='utf-8')
-		connection.setencoding(encoding='utf-8')
+			csv_file_path = file_path()
+			df = extract(odbc_conn)
+			time.sleep(0.5)
 
-		total_steps = 1
+			print("Cleaning, transforming and storing data to csv")
+			transform(df, csv_file_path)
+			time.sleep(0.5)
 
-		# Use tqdm to create a progress bar
-		for step in tqdm(range(total_steps), desc="Processing ..."):
+			print("Loading data from the csv to the mysql database")
+			load_csv_to_mysql('cdr_cpc', csv_file_path)
+			time.sleep(0.5)
+			
+			print("Removing the csv file from the system")
+			remove_file(csv_file_path)
 
-			# SQLCommand = 'SELECT * FROM emmab.cdr_cpc'
 
-			# df = pd.read_sql(SQLCommand, connection)
+		except Exception as e:
+			print(f"Error: {e}")
 
-			# selected_columns = ['FIELD_2', 'FIELD_7', 'FIELD_8', 'FIELD_9']
+		finally:
 
-			# selected_df = df[selected_columns]
+			odbc_conn.close()
 
-			csv_file = f'C:\\ProgramData\\MySQL\\MySQL Server 8.0\\Uploads\\cdr_cpc.csv'
+# Schedule tasks
+schedule.every().day.at('00:00').do(run_etl).tag('etl pipline')
+# schedule.every(5).seconds.do(run_etl).tag('etl pipline')
 
-			# # Exclude headers and index
-			# selected_df.to_csv(csv_file, header=False, index=False)
-
-			print("Loading data from the csv to the mysql database ...")
-
-			load_csv_to_mysql(
-				mysql_username, 
-				mysql_password, 
-				mysql_host, 
-				mysql_port, 
-				mysql_database, 
-				mysql_table, 
-				'cdr_cpc.csv'
-			)
-
-		
-		time.sleep(0.5)
-
-	except Exception as e:
-		print(f"Error: {e}")
-
-	finally:
-
-		connection.close()
-
+# Run the scheduled tasks continuously
+while True:
+    schedule.run_pending()
+    time.sleep(1)
 
