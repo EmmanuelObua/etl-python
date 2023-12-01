@@ -10,9 +10,9 @@ def file_path():
 	current_directory = os.path.abspath(os.path.dirname(__file__))
 	return f'{current_directory}\\cdr_cpc.csv'
 
-def extract(odbc_conn):
+def extract(table_name,odbc_conn):
 
-	SQLCommand = 'SELECT * FROM emmab.cdr_cpc'
+	SQLCommand = f"SELECT * FROM {table_name}"
 
 	print("Extracting data from the data source")
 	df = pd.read_sql(SQLCommand, odbc_conn)

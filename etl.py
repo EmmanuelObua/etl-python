@@ -33,7 +33,9 @@ def run_etl():
 			odbc_conn.setencoding(encoding='utf-8')
 
 			csv_file_path = file_path()
-			df = extract(odbc_conn)
+			table_name = 'cdr_cpc'
+			
+			df = extract(table_name, odbc_conn)
 			time.sleep(0.5)
 
 			print("Cleaning, transforming and storing data to csv")
@@ -41,7 +43,7 @@ def run_etl():
 			time.sleep(0.5)
 
 			print("Loading data from the csv to the mysql database")
-			load_csv_to_mysql('cdr_cpc', csv_file_path)
+			load_csv_to_mysql(table_name, csv_file_path)
 			time.sleep(0.5)
 			
 			print("Removing the csv file from the system")
